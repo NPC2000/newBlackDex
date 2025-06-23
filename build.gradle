@@ -1,75 +1,41 @@
-apply plugin: 'com.android.library'
+// Top-level build file where you can add configuration options common to all sub-projects/modules.
+buildscript {
+    ext {
+        kotlin_version = '1.5.0'
+    }
+    repositories {
+        maven { url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        mavenCentral { url 'https://maven.aliyun.com/repository/mavenCentral' }
+        mavenCentral { url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        maven { url 'https://repo1.maven.org/maven2/' }
+        maven { url 'https://jitpack.io' }
+    }
+    dependencies {
+        classpath 'com.android.tools.build:gradle:4.2.0'
+        classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
 
-android {
-    compileSdkVersion 28
-
-    defaultConfig {
-        minSdkVersion 21
-        targetSdkVersion 28
-
-        consumerProguardFiles "consumer-rules.pro"
-        ndk {
-            // 设置支持的SO库架构
-            abiFilters 'armeabi-v7a', 'arm64-v8a'
-        }
+        // NOTE: Do not place your application dependencies here; they belong
+        // in the individual module build.gradle files
     }
-
-    buildTypes {
-        release {
-            minifyEnabled false
-            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-        }
-    }
-    externalNativeBuild {
-        cmake {
-            path file('./src/main/cpp/CMakeLists.txt')
-        }
-    }
-    dexOptions {
-        preDexLibraries false
-        maxProcessCount 8
-        javaMaxHeapSize "4g"
-    }
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
-    }
-    aaptOptions {
-        cruncherEnabled = false
-        useNewCruncher = false
-    }
-    testOptions {
-        unitTests.returnDefaultValues = true
-    }
-    lintOptions {
-        checkReleaseBuilds false
-        abortOnError false
-        warningsAsErrors false
-        disable "UnusedResources", 'RestrictedApi'
-        textOutput "stdout"
-        textReport false
-        check 'NewApi', 'InlinedApi'
-    }
-    buildFeatures {
-        aidl true
-    }
-    namespace 'top.niunaijun.blackbox'
 }
 
+allprojects {
+    repositories {
+        maven { url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+        maven { url 'https://maven.aliyun.com/repository/google' }
+        maven { url 'https://maven.aliyun.com/repository/central' }
+        mavenCentral { url 'https://maven.aliyun.com/repository/jcenter' }
+        mavenCentral { url 'https://maven.aliyun.com/nexus/content/groups/public/' }
+        maven { url 'https://maven.aliyun.com/repository/gradle-plugin' }
+        maven { url 'https://repo1.maven.org/maven2/' }
+        maven { url 'https://jitpack.io' }
 
-tasks.withType(Javadoc) {
-    options.addStringOption('Xdoclint:none', '-quiet')
-    options.addStringOption('encoding', 'UTF-8')
-    options.addStringOption('charSet', 'UTF-8')
+    }
 }
 
-
-dependencies {
-//    implementation 'top.canyie.pine:core:0.3.0'
-//    implementation 'top.canyie.pine:xposed:0.2.0'
-    implementation fileTree(dir: "libs", include: ["*.jar"])
-    implementation 'androidx.appcompat:appcompat:1.2.0'
-    implementation 'me.weishu:free_reflection:3.0.1'
-    implementation project(':Bcore:black-hook')
-    implementation project(':Bcore:black-fake')
+task clean(type: Delete) {
+    delete rootProject.buildDir
 }
