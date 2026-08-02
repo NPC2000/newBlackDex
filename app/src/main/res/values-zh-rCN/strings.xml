@@ -1,0 +1,40 @@
+<resources>
+    <string name="filter">筛选</string>
+    <string name="choose">选择</string>
+    <string name="log">日志</string>
+    <string name="open_source">开源</string>
+    <string name="app_setting">设置</string>
+    <string name="unpack_success">脱壳成功</string>
+    <string name="unpack_fail">脱壳失败</string>
+    <string name="confirm">确认</string>
+    <string name="github">Github</string>
+    <string name="jump_issue">未知错误，可能是应用不兼容或存在环境检测导致失败，你可以在 GitHub 提交 Issue(https://github.com/CodingGay/BlackDex)。</string>
+    <string name="cancel">取消</string>
+    <string name="dex_save">.dex 文件已保存至：%1$s</string>
+    <string name="error_msg">错误：%1$s</string>
+    <string name="grant_permission">需要权限</string>
+    <string name="request_again">重试</string>
+    <string name="request_later">稍后</string>
+    <string name="jump_grant">授予权限</string>
+    <string name="request_fail">授权失败。</string>
+    <string name="denied_msg">拒绝读写本地文件权限将导致该功能不可用。</string>
+    <string name="request_storage_msg">没有所需权限，应用无法正确读写本地文件。</string>
+
+    <string name="file_save">文件</string>
+    <string name="use_default_file">使用默认存储路径</string>
+    <string name="rewrite_file_path">自定义存储路径</string>
+    <string name="warn">警告</string>
+    <string name="advanced_setting">高级设置</string>
+    <string name="fix_code_item">深度脱壳</string>
+    <string name="auto_call_method_desc">应用运行时主动调用方法</string>
+    <string name="auto_call_method">主动调用</string>
+    <string name="fix_code_item_desc">加载内存中被抽取的指令，并还原到 DexFile 中。</string>
+    <string name="fix_code_item_message">BlackDex 将在深度脱壳模式下修复 DexCode。可能出现以下情况：\n\n1.BlackDex 脱壳一个应用会花费更多时间，预计几分钟或更久。\n2.脱壳时目标应用可能崩溃（环境检测等）。\n3.脱壳失败率会上升。\n4.不总能成功修复所有方法。
+    </string>
+
+    <string name="dumping">脱壳中…</string>
+    <string name="hook_dump_desc">使用 Hook 提高脱壳成功率</string>
+    <string name="hook_dump">Hook 脱壳</string>
+    <string name="verify_dex">脱壳前校验 Dex</string>
+    <string name="verify_dex_desc">仅 dump 内存中 dex magic 合法的 cookie。当加固把内存中 dex magic 清零对抗脱壳时，可关闭此选项。</string>
+</resources>

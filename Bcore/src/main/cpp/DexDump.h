@@ -13,7 +13,7 @@
 class DexDump {
 public:
     static void hookDumpDex(JNIEnv *env, jstring dir);
-    static void cookieDumpDex(JNIEnv *env, jlong cookie, jstring dir, jboolean fix);
+    static void cookieDumpDex(JNIEnv *env, jlong cookie, jstring dir, jboolean fix, jboolean verify);
     //static void hookBeforeSoLoad(const char *fakePathArg);
 };
 

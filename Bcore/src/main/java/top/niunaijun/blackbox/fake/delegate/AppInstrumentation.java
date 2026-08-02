@@ -107,11 +107,10 @@ public final class AppInstrumentation extends BaseInstrumentationDelegate implem
         if (BlackBoxCore.get().isEnableHookDump()) {
             String absolutePath = new File(BlackBoxCore.get().getDexDumpDir(), context.getPackageName()).getAbsolutePath();
             FileUtils.mkdirs(absolutePath);
-            Class<?> aClass = cl.loadClass(VMCore.class.getName());
+            //直接用宿主的VMCore，避免通过目标classloader加载vm.apk里的VMCore造成两个VMCore类
+            //（native方法只RegisterNatives到先加载lib的那个，另一个会UnsatisfiedLinkError）
             try {
-                Method initDumpDex = aClass.getDeclaredMethod("hookDumpDex", String.class);
-                initDumpDex.setAccessible(true);
-                initDumpDex.invoke(null, absolutePath);
+                VMCore.hookDumpDex(absolutePath);
             } catch (Throwable e) {
                 e.printStackTrace();
             }

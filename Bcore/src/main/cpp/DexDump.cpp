@@ -53,21 +53,37 @@ int read_little_endian_uint32(const uint8_t *address) {
 
 void handleDumpByDexFile(void *dex_file) {
     char magic[8] = {0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x35, 0x00};
-    if (!PointerCheck::check(dex_file)) {
+    //必须先校准beginOffset（在hookDumpDex中调用init），否则无法定位dex内存起始地址
+    if (beginOffset < 0) {
+        ALOGE("handleDumpByDexFile: beginOffset=%d (not calibrated), skip", beginOffset);
         return;
     }
-    auto dexFile = static_cast<art_lkchan::DexFile *>(dex_file);
-
-    int size;
-    //安卓15dex_file构造参数把size删了
-    if (android_get_device_api_level() >= 35){
-        const uint8_t *base = dexFile->Begin();
-        //从dex起始地址偏移0x20的位置存储的是dex的大小
-        auto size_begin = base + 0x20;
-        size = read_little_endian_uint32(size_begin);
-    }else{
-        size = dexFile->Size();
+    auto base = reinterpret_cast<char *>(dex_file);
+    if (!PointerCheck::check(reinterpret_cast<void *>(base))) {
+        ALOGE("handleDumpByDexFile: dex_file=%p not readable, skip", dex_file);
+        return;
     }
+    //用校准的beginOffset读取dex在内存中的起始地址，和cookieDumpDex保持一致
+    //（不能直接用art_lkchan::DexFile::Begin()的硬编码偏移，Android高版本布局已变）
+    auto begin = *(size_t *) (base + beginOffset * sizeof(size_t));
+    if (!PointerCheck::check(reinterpret_cast<void *>(begin))) {
+        ALOGE("handleDumpByDexFile: begin=%p not readable (beginOffset=%d), skip", (void*)begin, beginOffset);
+        return;
+    }
+    auto beginBytes = reinterpret_cast<const uint8_t *>(begin);
+    //从dex起始地址偏移0x20的位置存储的是dex的大小
+    int size = read_little_endian_uint32(beginBytes + 0x20);
+    //校验size合理性，避免垃圾size导致memcpy越界
+    if (size <= 0 || size > 0x10000000) {
+        ALOGE("handleDumpByDexFile: invalid size=%d (begin=%p), skip", size, (void*)begin);
+        return;
+    }
+    //确保整个dex范围可读
+    if (!PointerCheck::check(reinterpret_cast<void *>(begin + size - 8))) {
+        ALOGE("handleDumpByDexFile: dex range [begin, begin+size) not readable, size=%d, skip", size);
+        return;
+    }
+    ALOGE("handleDumpByDexFile: dex_file=%p begin=%p size=%d, dumping", dex_file, (void*)begin, size);
 
     list<int>::iterator iterator;
     for (iterator = dumped.begin(); iterator != dumped.end(); ++iterator) {
@@ -78,7 +94,7 @@ void handleDumpByDexFile(void *dex_file) {
     }
     void *buffer = malloc(size);
     if (buffer) {
-        memcpy(buffer, dexFile->Begin(), size);
+        memcpy(buffer, beginBytes, size);
         // fix magic
         memcpy(buffer, magic, sizeof(magic));
 
@@ -165,6 +181,19 @@ HOOK_FUN(void, LoadMethodL, void *thiz,
     handleDumpByDexFile(dex_file);
 }
 
+// Android 16+: ClassLinker::LoadMethod is no longer exported from libart.so.
+// Hook the exported ClassLinker::LoadClass instead, which is called per-class
+// with the same DexFile reference.
+// Signature: LoadClass(this, Thread*, const DexFile&, const dex::ClassDef&, Handle<mirror::Class>)
+HOOK_FUN(void, LoadClass, void *thiz,
+         void *thread,
+         void *dex_file,
+         void *class_def,
+         void *klass) {
+    orig_LoadClass(thiz, thread, dex_file, class_def, klass);
+    handleDumpByDexFile(dex_file);
+}
+
 //这里是hook程序的so文件加载。
 //具体请看：https://xrefandroid.com/android-15.0.0_r1/xref/art/runtime/jni/java_vm_ext.cc#72
 /*HOOK_FUN(void, LoadNativeLibraryV, void *thiz,
@@ -209,14 +238,24 @@ void init(JNIEnv *env) {
             continue;
         }
         auto dex = reinterpret_cast<char *>(cookie);
-        for (int ii = 0; ii < 10; ++ii) {
+        if (!PointerCheck::check(dex)) {
+            continue;
+        }
+        for (int ii = 1; ii < 10; ++ii) {
             auto value = *(size_t *) (dex + ii * sizeof(size_t));
             if (value == 1872) {
-                beginOffset = ii - 1;
-                // auto dexBegin = *(size_t *) (dex + beginOffset * sizeof(size_t));
-                // HexDump(reinterpret_cast<char *>(dexBegin), 10, 0);
-                env->ReleaseLongArrayElements(emptyCookie, long_data, 0);
-                return;
+                int candidate = ii - 1;
+                auto candidateBegin = *(size_t *) (dex + candidate * sizeof(size_t));
+                //校准出的begin必须指向真实的dex（magic校验），避免误匹配到OatFile等非DexFile的cookie
+                if (PointerCheck::check(reinterpret_cast<void *>(candidateBegin))) {
+                    auto magicPtr = reinterpret_cast<const uint8_t *>(candidateBegin);
+                    if (magicPtr[0] == 0x64 && magicPtr[1] == 0x65 &&
+                        magicPtr[2] == 0x78 && magicPtr[3] == 0x0a) {
+                        beginOffset = candidate;
+                        env->ReleaseLongArrayElements(emptyCookie, long_data, 0);
+                        return;
+                    }
+                }
             }
         }
     }
@@ -276,7 +315,7 @@ void fixCodeItem(JNIEnv *env, const art_lkchan::DexFile *dex_file_, size_t begin
     }
 }
 
-void DexDump::cookieDumpDex(JNIEnv *env, jlong cookie, jstring dir, jboolean fix) {
+void DexDump::cookieDumpDex(JNIEnv *env, jlong cookie, jstring dir, jboolean fix, jboolean verify) {
     //没有执行初始化的话执行初始化
     if (beginOffset == -2) {
         init(env);
@@ -288,78 +327,107 @@ void DexDump::cookieDumpDex(JNIEnv *env, jlong cookie, jstring dir, jboolean fix
     char magic[8] = {0x64, 0x65, 0x78, 0x0a, 0x30, 0x33, 0x35, 0x00};
     //获取cookie指针地址
     auto base = reinterpret_cast<char *>(cookie);
+    if (!PointerCheck::check(reinterpret_cast<void *>(base))) {
+        return;
+    }
     //获取dex文件在内存中的起始地址
     auto begin = *(size_t *) (base + beginOffset * sizeof(size_t));
     if (!PointerCheck::check(reinterpret_cast<void *>(begin))) {
         return;
     }
-    //定义写出的dex文件路径
-    auto dirC = env->GetStringUTFChars(dir, 0);
-    //从起始地址偏移0x20来获取dex文件实际大小
-    auto dexSizeOffset = ((unsigned long) begin) + 0x20;
-    int size = read_little_endian_uint32((const uint8_t*)dexSizeOffset);//*(size_t *) dexSizeOffset;
-    //申请一块dex长度的地址存放dex数据
-    void *buffer = malloc(size);
-    if (buffer) {
-        //如果地址可用（申请成功）把dex数据复制到新地址
-        memcpy(buffer, reinterpret_cast<const void *>(begin), size);
-        // fix magic
-        memcpy(buffer, magic, sizeof(magic));
-
-        const bool kVerifyChecksum = false;
-        const bool kVerify = true;
-        //创造一个DexFileLoader变量
-        const art_lkchan::DexFileLoader dex_file_loader;
-        std::string error_msg;
-        std::vector<std::unique_ptr<const art_lkchan::DexFile>> dex_files;
-        //把dex对应的一些数据写到这个DexFileLoader变量中
-        if (!dex_file_loader.OpenAll(reinterpret_cast<const uint8_t *>(buffer),
-                                     size,
-                                     "",
-                                     kVerify,
-                                     kVerifyChecksum,
-                                     &error_msg,
-                                     &dex_files)) {
-            // Display returned error message to user. Note that this error behavior
-            // differs from the error messages shown by the original Dalvik dexdump.
-            ALOGE("Open dex error %s", error_msg.c_str());
+    auto beginBytes = reinterpret_cast<const uint8_t *>(begin);
+    //可选：校验dex magic，过滤掉非DexFile的cookie（如mCookie[0]的OatFile指针）。
+    //部分加固会把内存中dex magic清零来对抗脱壳，此时可关闭该选项以dump出magic被破坏的dex。
+    if (verify) {
+        if (beginBytes[0] != 0x64 || beginBytes[1] != 0x65 ||
+            beginBytes[2] != 0x78 || beginBytes[3] != 0x0a) {
             return;
         }
-        //判断是否开启了深度脱壳
-        if (fix) {
-            //开启了深度脱壳的话把JNIEnv *,DexFile原始指针？（不是很懂）,Dex在内存中起始地址传入fixCodeItem开始修复方法CodeItem
-            fixCodeItem(env, dex_files[0].get(), begin);
-        }
-        //创建写出的dex文件
-        char path[1024];
-        sprintf(path, "%s/cookie_%d.dex", dirC, size);
-        auto fd = open(path, O_CREAT | O_WRONLY, 0600);
-        //写出dex文件并刷新数据
-        ssize_t w = write(fd, buffer, size);
-        fsync(fd);
-        if (w > 0) {
-            ALOGE("cookie dump dex ======> %s", path);
-        } else {
-            remove(path);
-        }
-        close(fd);
-        //释放内存
-        free(buffer);
-        env->ReleaseStringUTFChars(dir, dirC);
     }
+    //从起始地址偏移0x20来获取dex文件实际大小
+    int size = read_little_endian_uint32(beginBytes + 0x20);
+    //校验size合理性，避免垃圾size导致memcpy越界
+    if (size <= 0 || size > 0x10000000) {
+        return;
+    }
+    //确保整个dex范围可读
+    if (!PointerCheck::check(reinterpret_cast<void *>(begin + size - 8))) {
+        return;
+    }
+    //申请一块dex长度的地址存放dex数据
+    void *buffer = malloc(size);
+    if (!buffer) {
+        return;
+    }
+    //如果地址可用（申请成功）把dex数据复制到新地址
+    memcpy(buffer, reinterpret_cast<const void *>(begin), size);
+    // fix magic
+    memcpy(buffer, magic, sizeof(magic));
+
+    const bool kVerifyChecksum = false;
+    const bool kVerify = true;
+    //创造一个DexFileLoader变量
+    const art_lkchan::DexFileLoader dex_file_loader;
+    std::string error_msg;
+    std::vector<std::unique_ptr<const art_lkchan::DexFile>> dex_files;
+    //把dex对应的一些数据写到这个DexFileLoader变量中
+    if (!dex_file_loader.OpenAll(reinterpret_cast<const uint8_t *>(buffer),
+                                 size,
+                                 "",
+                                 kVerify,
+                                 kVerifyChecksum,
+                                 &error_msg,
+                                 &dex_files)) {
+        // Display returned error message to user. Note that this error behavior
+        // differs from the error messages shown by the original Dalvik dexdump.
+        ALOGE("Open dex error %s", error_msg.c_str());
+        free(buffer);
+        return;
+    }
+    //判断是否开启了深度脱壳
+    if (fix) {
+        //开启了深度脱壳的话把JNIEnv *,DexFile原始指针？（不是很懂）,Dex在内存中起始地址传入fixCodeItem开始修复方法CodeItem
+        fixCodeItem(env, dex_files[0].get(), begin);
+    }
+    //定义写出的dex文件路径
+    auto dirC = env->GetStringUTFChars(dir, 0);
+    //创建写出的dex文件
+    char path[1024];
+    sprintf(path, "%s/cookie_%d.dex", dirC, size);
+    auto fd = open(path, O_CREAT | O_WRONLY, 0600);
+    //写出dex文件并刷新数据
+    ssize_t w = write(fd, buffer, size);
+    fsync(fd);
+    if (w > 0) {
+        ALOGE("cookie dump dex ======> %s", path);
+    } else {
+        remove(path);
+    }
+    close(fd);
+    //释放内存
+    free(buffer);
+    env->ReleaseStringUTFChars(dir, dirC);
 }
 
 void DexDump::hookDumpDex(JNIEnv *env, jstring dir) {
     dumpPath = env->GetStringUTFChars(dir, 0);
     const char *libart = "libart.so";
 
+    //先校准beginOffset，确保LoadClass触发handleDumpByDexFile时能正确定位dex内存
+    if (beginOffset == -2) {
+        init(env);
+    }
+    ALOGE("hookDumpDex: after init, beginOffset=%d", beginOffset);
+
     //Vanilla Ice Cream  --安卓15
     void *loadMethod = DobbySymbolResolver(libart,
                                            "_ZN3art11ClassLinker10LoadMethodERKNS_7DexFileERKNS_13ClassAccessor6MethodENS_6ObjPtrINS_6mirror5ClassEEEPNS0_25MethodAnnotationsIteratorEPNS_9ArtMethodE");
+    ALOGE("hookDumpDex: LoadMethod(V15)=%p", loadMethod);
     // UpsideDownCake  --安卓14
     if(!loadMethod) {
         loadMethod = DobbySymbolResolver(libart,
                                          "_ZN3art11ClassLinker10LoadMethodERKNS_7DexFileERKNS_13ClassAccessor6MethodENS_6ObjPtrINS_6mirror5ClassEEEPNS_9ArtMethodE");
+        ALOGE("hookDumpDex: LoadMethod(V14)=%p", loadMethod);
     }
 
     if (!loadMethod) {
@@ -379,8 +447,8 @@ void DexDump::hookDumpDex(JNIEnv *env, jstring dir) {
                                          "_ZN3art11ClassLinker10LoadMethodERKNS_7DexFileERKNS_13ClassAccessor6MethodENS_6HandleINS_6mirror5ClassEEEPNS_9ArtMethodE");
     }
 
-    _make_rwx(loadMethod, _page_size);
     if (loadMethod) {
+        _make_rwx(loadMethod, _page_size);
         if (android_get_device_api_level() >= 35){
             DobbyHook(loadMethod,(void *) new_LoadMethodV,
                       (void **) &orig_LoadMethodV);
@@ -394,6 +462,19 @@ void DexDump::hookDumpDex(JNIEnv *env, jstring dir) {
             DobbyHook(loadMethod, (void *) new_LoadMethodL,
                       (void **) &orig_LoadMethodL);
         }
+        ALOGE("hookDumpDex: hooked LoadMethod, api=%d", android_get_device_api_level());
+        return;
+    }
+
+    // Android 16+ 回退：ClassLinker::LoadMethod 已不再导出，改 hook 导出的 LoadClass
+    void *loadClass = DobbySymbolResolver(libart,
+                                          "_ZN3art11ClassLinker9LoadClassEPNS_6ThreadERKNS_7DexFileERKNS_3dex8ClassDefENS_6HandleINS_6mirror5ClassEEE");
+    ALOGE("hookDumpDex: LoadClass=%p", loadClass);
+    if (loadClass) {
+        _make_rwx(loadClass, _page_size);
+        int ret = DobbyHook(loadClass, (void *) new_LoadClass,
+                  (void **) &orig_LoadClass);
+        ALOGE("hookDumpDex: DobbyHook LoadClass ret=%d", ret);
     }
 }
 

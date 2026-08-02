@@ -61,14 +61,19 @@ public class HCallbackProxy implements IInjectHook, Handler.Callback {
     public boolean handleMessage(@NonNull Message msg) {
         if (!mBeing.getAndSet(true)) {
             try {
-                if (BuildCompat.isPie()) {
-                    if (msg.what == ActivityThread.H.EXECUTE_TRANSACTION.get()) {
-                        if (handleLaunchActivity(msg.obj)) {
-                            getH().sendMessageAtFrontOfQueue(Message.obtain(msg));
-                            return true;
+            if (BuildCompat.isPie()) {
+                if (msg.what == ActivityThread.H.EXECUTE_TRANSACTION.get()) {
+                    handleLaunchActivity(msg.obj);
+                    if (BActivityThread.sDumping) {
+                        try {
+                            getH().handleMessage(msg);
+                        } catch (Throwable e) {
+                            Log.e(TAG, "swallow transaction during dump", e);
                         }
+                        return true;
                     }
-                } else {
+                }
+            } else {
                     if (msg.what == ActivityThread.H.LAUNCH_ACTIVITY.get()) {
                         if (handleLaunchActivity(msg.obj)) {
                             getH().sendMessageAtFrontOfQueue(Message.obtain(msg));

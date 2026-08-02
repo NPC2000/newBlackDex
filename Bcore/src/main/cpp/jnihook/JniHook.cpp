@@ -62,6 +62,9 @@ JniHook::HookJniFun(JNIEnv *env, const char *class_name, const char *method_name
     if (ArtM::GetArtMethodNativeOffset() == 0) {
         return;
     }
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
     jclass clazz = env->FindClass(class_name);
     if (!clazz) {
         ALOGD("findClass fail: %s %s", class_name, method_name);
@@ -84,6 +87,13 @@ JniHook::HookJniFun(JNIEnv *env, const char *class_name, const char *method_name
     };
 
     auto artMethod = reinterpret_cast<uintptr_t *>(ArtM::GetArtMethod(env, clazz, method));
+    if (env->ExceptionCheck()) {
+        env->ExceptionClear();
+    }
+    if (!artMethod) {
+        ALOGE("get art method fail. class：%s, method：%s", class_name, method_name);
+        return;
+    }
     if (!CheckFlags(artMethod)) {
         ALOGE("check flags error. class：%s, method：%s", class_name, method_name);
         return;
@@ -91,6 +101,7 @@ JniHook::HookJniFun(JNIEnv *env, const char *class_name, const char *method_name
     *orig_fun = reinterpret_cast<void *>(artMethod[ArtM::GetArtMethodNativeOffset()]);
     if (env->RegisterNatives(clazz, gMethods, 1) < 0) {
         ALOGE("jni hook error. class：%s, method：%s", class_name, method_name);
+        env->ExceptionClear();
         return;
     }
     // FastNative

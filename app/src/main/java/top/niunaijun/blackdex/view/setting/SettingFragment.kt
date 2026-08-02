@@ -32,6 +32,8 @@ class SettingFragment : PreferenceFragmentCompat() {
 
     private lateinit var hookDumpPreference: SwitchPreferenceCompat
 
+    private lateinit var verifyDexPreference: SwitchPreferenceCompat
+
     private val initialDirectory = AppManager.mBlackBoxLoader.getSavePath()
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -55,6 +57,10 @@ class SettingFragment : PreferenceFragmentCompat() {
         autoCallMethodPreference = findPreference("auto_call_method")!!
         autoCallMethodPreference.onPreferenceChangeListener = mAutoCallMethodChange
         autoCallMethodPreference.isChecked = AppManager.mBlackBoxLoader.isAutoCallMethod()
+
+        verifyDexPreference = findPreference("verify_dex")!!
+        verifyDexPreference.onPreferenceChangeListener = mVerifyDexChange
+        verifyDexPreference.isChecked = AppManager.mBlackBoxLoader.isVerifyDex()
 
     }
 
@@ -119,6 +125,11 @@ class SettingFragment : PreferenceFragmentCompat() {
 
     private val mAutoCallMethodChange = Preference.OnPreferenceChangeListener { _, newValue ->
         AppManager.mBlackBoxLoader.setAutoCallMethod(newValue as Boolean)
+        return@OnPreferenceChangeListener true
+    }
+
+    private val mVerifyDexChange = Preference.OnPreferenceChangeListener { _, newValue ->
+        AppManager.mBlackBoxLoader.setVerifyDex(newValue as Boolean)
         return@OnPreferenceChangeListener true
     }
 

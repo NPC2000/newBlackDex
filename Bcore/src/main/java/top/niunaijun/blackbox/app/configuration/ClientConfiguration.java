@@ -37,4 +37,8 @@ public abstract class ClientConfiguration {
     }
 
     public boolean isAutoCallMethod(){return false;}
+
+    public boolean isVerifyDex() {
+        return true;
+    }
 }

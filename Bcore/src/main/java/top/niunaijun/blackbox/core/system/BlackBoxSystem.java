@@ -69,6 +69,12 @@ public class BlackBoxSystem {
 
     private void initJarEnv() {
         try {
+            //handleBindApplication 会把这些 jar 设为只读（Android14+ dex校验），覆盖更新前必须先设回可写，
+            //否则旧的只读 vm.apk 无法被新版本覆盖，导致 :p0 加载到过期的 VMCore 类
+            JUNIT_JAR.setWritable(true);
+            EMPTY_JAR.setWritable(true);
+            VM_JAR.setWritable(true);
+
             InputStream junit = BlackBoxCore.getContext().getAssets().open("junit.jar");
             FileUtils.copyFile(junit, JUNIT_JAR);
 

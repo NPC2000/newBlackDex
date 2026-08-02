@@ -36,4 +36,6 @@
     <string name="dumping">Unpacking…</string>
     <string name="hook_dump_desc">Use hook to improve the success rate of unpacking</string>
     <string name="hook_dump">Hook Dump</string>
+    <string name="verify_dex">Verify Dex Before Dump</string>
+    <string name="verify_dex_desc">Only dump cookies whose in-memory dex magic is valid. Disable it when the packer zeroes the dex magic in memory to anti-dump.</string>
 </resources>

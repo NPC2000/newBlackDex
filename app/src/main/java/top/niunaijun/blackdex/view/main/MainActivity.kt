@@ -62,6 +62,10 @@ class MainActivity : PermissionActivity() {
         viewBinding.recyclerView.adapter = mAdapter
         viewBinding.recyclerView.layoutManager = LinearLayoutManager(this)
 
+        viewBinding.swipeRefreshLayout.setOnRefreshListener {
+            viewModel.getAppList()
+        }
+
         mAdapter.setOnItemClick { _, _, data ->
             if (viewBinding.searchView.isSearchOpen) {
                 viewBinding.searchView.closeSearch()
@@ -105,6 +109,7 @@ class MainActivity : PermissionActivity() {
 
         viewModel.mAppListLiveData.observe(this) {
             it?.let {
+                viewBinding.swipeRefreshLayout.isRefreshing = false
                 this.appList = it
                 viewBinding.searchView.setQuery("", false)
                 filterApp("")

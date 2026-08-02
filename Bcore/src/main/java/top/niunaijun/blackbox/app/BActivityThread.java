@@ -13,6 +13,7 @@ import android.os.ConditionVariable;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Looper;
+import android.os.Process;
 import android.util.Log;
 
 import java.io.File;
@@ -147,6 +148,8 @@ public class BActivityThread extends IBActivityThread.Stub {
     public static ClassLoader loadedApkClassLoader;
     public static Context dumpTargetContext;
 
+    public static volatile boolean sDumping = false;
+
     private synchronized void handleBindApplication(String packageName, String processName) {
         DumpResult result = new DumpResult();
         result.packageName = packageName;
@@ -264,6 +267,7 @@ public class BActivityThread extends IBActivityThread.Stub {
                     //走到这里已经寄了，牛奶哥说可以挣扎一下，（`_`）
                     loader = application.getClassLoader();
                 }
+                sDumping = true;
                 handleDumpDex(packageName, result, loader);
             }
         } catch (Throwable e) {
@@ -284,6 +288,7 @@ public class BActivityThread extends IBActivityThread.Stub {
             try {
                 VMCore.cookieDumpDex(classLoader, packageName);
             } finally {
+                sDumping = false;
                 mAppConfig = null;
                 File dir = new File(result.dir);
                 if (!dir.exists() || dir.listFiles().length == 0) {
@@ -292,6 +297,7 @@ public class BActivityThread extends IBActivityThread.Stub {
                     BlackBoxCore.getBDumpManager().noticeMonitor(result.dumpSuccess());
                 }
                 BlackBoxCore.get().uninstallPackage(packageName);
+                Process.killProcess(Process.myPid());
             }
         }).start();
     }

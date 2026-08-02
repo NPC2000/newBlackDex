@@ -252,6 +252,11 @@ public class BlackBoxCore extends ClientConfiguration {
         return mClientConfiguration.isEnableHookDump();
     }
 
+    @Override
+    public boolean isVerifyDex() {
+        return mClientConfiguration.isVerifyDex();
+    }
+
     private void startLogcat() {
         File file = new File(Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS), getContext().getPackageName() + "_logcat.txt");
         FileUtils.deleteDir(file);

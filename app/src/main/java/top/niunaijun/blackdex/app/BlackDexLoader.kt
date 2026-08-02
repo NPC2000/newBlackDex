@@ -27,6 +27,8 @@ class BlackDexLoader {
 
     private var mAutoCallMethod by AppSharedPreferenceDelegate(App.getContext(),false)
 
+    private var mVerifyDex by AppSharedPreferenceDelegate(App.getContext(), true)
+
     private var mDir = if (mSaveEnable) {
         getDexDumpDir(App.getContext())
     } else {
@@ -57,6 +59,10 @@ class BlackDexLoader {
 
             override fun isAutoCallMethod(): Boolean {
                 return mAutoCallMethod
+            }
+
+            override fun isVerifyDex(): Boolean {
+                return mVerifyDex
             }
         })
     }
@@ -104,6 +110,15 @@ class BlackDexLoader {
 
     fun setAutoCallMethod(enable: Boolean) {
         this.mAutoCallMethod = enable
+    }
+
+
+    fun isVerifyDex(): Boolean {
+        return mVerifyDex
+    }
+
+    fun setVerifyDex(enable: Boolean) {
+        this.mVerifyDex = enable
     }
 
 

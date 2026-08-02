@@ -26,6 +26,10 @@
                 android:key="auto_call_method"
                 android:summary="@string/auto_call_method_desc"
                 android:title="@string/auto_call_method"/>
+        <SwitchPreferenceCompat
+                android:key="verify_dex"
+                android:summary="@string/verify_dex_desc"
+                android:title="@string/verify_dex"/>
 
     </PreferenceCategory>
 

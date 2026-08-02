@@ -110,12 +110,17 @@ __attribute__((section (".mytext")))  JNICALL void native_offset2
 
 void registerArtNative(JNIEnv *env) {
     jclass clazz = env->FindClass("top/niunaijun/jnihook/jni/ArtMethod");
+    if (!clazz) {
+        env->ExceptionClear();
+        return;
+    }
     JNINativeMethod gMethods[] = {
             {"nativeOffset",  "()V",        (void *) native_offset},
             {"nativeOffset2", "()V",        (void *) native_offset2},
     };
     if (env->RegisterNatives(clazz, gMethods, sizeof(gMethods) / sizeof(gMethods[0])) < 0) {
         ALOGE("jni register error.");
+        env->ExceptionClear();
     }
 }
 

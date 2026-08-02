@@ -1,0 +1,5 @@
+*.jks
+/.gradle
+/.idea
+/build
+AGENTS.md

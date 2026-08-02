@@ -187,8 +187,8 @@ void hookDumpDex(JNIEnv *env, jobject clazz, jstring dir) {
 
 }
 
-void cookieDumpDex(JNIEnv *env, jclass clazz, jlong cookie, jstring dir, jboolean fixCodeItem) {
-    DexDump::cookieDumpDex(env, cookie, dir, fixCodeItem);
+void cookieDumpDex(JNIEnv *env, jclass clazz, jlong cookie, jstring dir, jboolean fixCodeItem, jboolean verify) {
+    DexDump::cookieDumpDex(env, cookie, dir, fixCodeItem, verify);
 }
 
 /*void hookBeforeSoLoad(JNIEnv *env, jclass clazz, jstring fakePath) {
@@ -201,7 +201,7 @@ static JNINativeMethod gMethods[] = {
         {"enableIO",        "()V",                                     (void *) enableIO},
         {"init",            "(I)V",                                    (void *) init},
         {"hookDumpDex",     "(Ljava/lang/String;)V",                   (void *) hookDumpDex},
-        {"cookieDumpDex",   "(JLjava/lang/String;Z)V",                 (void *) cookieDumpDex},
+        {"cookieDumpDex",   "(JLjava/lang/String;ZZ)V",                 (void *) cookieDumpDex},
         /*{"hookBeforeSoLoad","(Ljava/lang/String;)V",                   (void *) hookBeforeSoLoad},*/
 };
 

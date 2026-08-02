@@ -51,9 +51,9 @@ public class VMCore {
 
     public static native void hideXposed();
 
-    private static native void cookieDumpDex(long cookie, String dir, boolean fixMethod);
+    private static native void cookieDumpDex(long cookie, String dir, boolean fixMethod, boolean verify);
 
-    private static native void hookDumpDex(String dir);
+    public static native void hookDumpDex(String dir);
 
     //public static native void hookBeforeSoLoad(String fakePath);
 
@@ -89,7 +89,7 @@ public class VMCore {
                 }
             }
             executorService.execute(() -> {
-                cookieDumpDex(cookie, file.getAbsolutePath(), BlackBoxCore.get().isFixCodeItem());
+                cookieDumpDex(cookie, file.getAbsolutePath(), BlackBoxCore.get().isFixCodeItem(), BlackBoxCore.get().isVerifyDex());
                 BlackBoxCore.getBDumpManager().noticeMonitor(result.dumpProcess(cookies.size(), atomicInteger.getAndIncrement()));
                 countDownLatch.countDown();
             });
