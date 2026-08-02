@@ -29,6 +29,10 @@ class BlackDexLoader {
 
     private var mVerifyDex by AppSharedPreferenceDelegate(App.getContext(), true)
 
+    private var m32BitCompat by AppSharedPreferenceDelegate(App.getContext(), false)
+
+    private var mDualArchDump by AppSharedPreferenceDelegate(App.getContext(), false)
+
     private var mDir = if (mSaveEnable) {
         getDexDumpDir(App.getContext())
     } else {
@@ -47,6 +51,10 @@ class BlackDexLoader {
 
             override fun getDexDumpDir(): String {
                 return mDir
+            }
+
+            override fun getDumpSubDir(): String {
+                return if (mDualArchDump) "arm64" else ""
             }
 
             override fun isFixCodeItem(): Boolean {
@@ -119,6 +127,26 @@ class BlackDexLoader {
 
     fun setVerifyDex(enable: Boolean) {
         this.mVerifyDex = enable
+    }
+
+    fun is32BitCompat(): Boolean {
+        return m32BitCompat
+    }
+
+    fun set32BitCompat(enable: Boolean) {
+        this.m32BitCompat = enable
+    }
+
+    fun isDualArchDump(): Boolean {
+        return mDualArchDump
+    }
+
+    fun setDualArchDump(enable: Boolean) {
+        this.mDualArchDump = enable
+    }
+
+    fun getBaseDumpDir(): String {
+        return mDir
     }
 
 

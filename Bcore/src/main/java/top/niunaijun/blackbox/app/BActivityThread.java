@@ -153,7 +153,12 @@ public class BActivityThread extends IBActivityThread.Stub {
     private synchronized void handleBindApplication(String packageName, String processName) {
         DumpResult result = new DumpResult();
         result.packageName = packageName;
-        result.dir = new File(BlackBoxCore.get().getDexDumpDir(), packageName).getAbsolutePath();
+        File dirFile = new File(BlackBoxCore.get().getDexDumpDir(), packageName);
+        String subDir = BlackBoxCore.get().getDumpSubDir();
+        if (subDir != null && !subDir.isEmpty()) {
+            dirFile = new File(dirFile, subDir);
+        }
+        result.dir = dirFile.getAbsolutePath();
         try {
             PackageInfo packageInfo = BlackBoxCore.getBPackageManager().getPackageInfo(packageName, PackageManager.GET_PROVIDERS, BActivityThread.getUserId());
             if (packageInfo == null)
@@ -175,7 +180,7 @@ public class BActivityThread extends IBActivityThread.Stub {
             LoadedApk.mApplicationInfo.set(loadedApk, applicationInfo);
 
             // clear dump file
-            FileUtils.deleteDir(new File(BlackBoxCore.get().getDexDumpDir(), packageName));
+            FileUtils.deleteDir(dirFile);
 
             // init vmCore
             VMCore.init(Build.VERSION.SDK_INT);

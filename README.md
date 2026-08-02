@@ -21,11 +21,15 @@ BlackDex 用于把 Android 应用运行时加载到内存中的 DEX 文件 dump 
 ## 支持范围与限制
 
 - **系统版本**：仅向上兼容到 Android 14+，实测机型为 Android 16（HyperOS 3）。更低版本不保证。
-- **架构**：arm64-v8a（默认 BlackDex64）、armeabi-v7a（BlackDex32）
+- **架构**：
+  - arm64-v8a（默认 BlackDex64）
+  - armeabi-v7a（通过内嵌 32 位 Helper 辅助程序实现，无需单独安装 BlackDex32）
 - **可用脱壳方式**：
   - ✅ Cookie 模式内存 dump（主路径，已修复）
   - ✅ Hook 脱壳（已修复，Android 16 改 hook `LoadClass`）
   - ✅ 主动调用脱壳（cookie 模式下，用于对抗函数抽取壳）
+  - ✅ 32 位应用脱壳（通过 Helper 辅助程序）
+  - ✅ 双架构同时脱壳（32+64 位并行，结果分别保存）
   - ❌ 深度脱壳（fixCodeItem）**未修复**：Android 13 起 `ArtMethod` 删除了 `dex_code_item_offset_`，原偏移计算逻辑失效，本仓库未修复，用「主动调用」代替。
 - **不做**：不包含任何针对加固厂商的过检测、反反调试等行为，能否脱出看壳的实现与运气。
 - 可能出现：脱不出东西、进程卡死、目标 app 异常退出等。属正常现象。
@@ -52,6 +56,7 @@ App (Application)
 - **主进程** `top.niunaijun.blackdexa64`：UI 与调度，`WelcomeActivity -> MainActivity`。
 - **`:black` 进程**：系统服务进程，承载 `DaemonService` 和 `SystemCallProvider`，是 IPC 与包管理的核心。启动时会把 `empty.jar`/`junit.jar`/`vm.jar` 从 assets 拷贝到 `virtual/cache/` 下作为运行时依赖。
 - **`:p0`..`:p99` 代理进程**：目标 app 实际运行的进程。`BActivityThread` 是每个代理进程的入口，负责绑定目标 app 并触发脱壳。
+- **Helper 辅助程序** `top.niunaijun.blackdex32helper`（32 位）：内嵌在主 App assets 中，按需安装。拥有自己的 `:black`、`:p0`..`:p99` 进程，全部以 32 位模式运行，用于脱壳 32 位应用。
 
 ### 启动一次脱壳的时序
 
@@ -93,6 +98,27 @@ App (Application)
 - 对「函数抽取壳」（运行时才把被抽取的 code item 还原回内存），主动调用能让这些 code item 被还原，提升 dump 出的 dex 的完整度。
 - 过滤掉 `com.luoye.dpt`（dpt 壳检测类）和 `top.niunaijun`（自身类），避免被检测或循环。
 
+### 32 位兼容脱壳
+
+Android 16 上同一 APK 只能以一种 ABI 运行，64 位主 App 无法直接脱壳 32 位应用。解决方案：
+
+1. 主 App 内嵌一个精简的 32 位 Helper APK（`assets/helper32.apk`，约 3.7MB），按需安装。
+2. 用户在设置页启用「32 位兼容」并安装 Helper。
+3. 脱壳 32 位应用时，主 App 通过透明 Activity 启动 Helper 的 `DumpLauncherActivity`，传递目标包名和配置。
+4. Helper 在自己的沙箱中执行完整的脱壳流程（与主 App 逻辑相同，但以 32 位运行）。
+5. 脱壳进度通过 Broadcast 广播实时回传主 App，UI 统一在主 App 显示。
+6. Helper 配置通过 SharedPreferences 跨进程共享（主进程设置，`:p0` 进程读取）。
+
+**Dump 目录**：Helper 优先尝试写入主 App 的 `Download/dexDump/`，若不可写（scoped storage 限制）则回退到自身 `getExternalFilesDir/dexDump/`。
+
+### 双架构同时脱壳
+
+开启后，对于同时包含 32 位和 64 位库的目标应用，主 App（64 位）和 Helper（32 位）同时执行脱壳：
+
+- 主 App 64 位 dump -> `dexDump/<包名>/arm64/`
+- Helper 32 位 dump -> `dexDump/<包名>/arm32/`
+- 两个 dump 并行执行，主 App 等待两者都完成后显示合并结果
+
 ### native 注册与 VMCore 类
 
 - `VMCore` 是 native 方法承载类。`libblackdex.so` 在 `JNI_OnLoad` 里通过 `RegisterNatives` 把 native 方法注册到 `VMCore`。
@@ -105,6 +131,8 @@ App (Application)
 - `:p0` 进程在 `ProxyActivity` 装饰窗创建时，框架会调 `Settings.Global` 读取桌面模式标志，目标 app 包名与宿主 uid 不匹配会抛 `SecurityException` 杀进程（在 dump 线程跑之前）。新增 `sDumping` 标志，dump 期间 `HCallbackProxy` 手动派发事务并吞掉框架异常，保证 dump 线程跑完；dump 完成后主动 `Process.killProcess` 退出 `:p0`。
 - `ClassLinker::LoadMethod` 不再导出 -> 改 hook `LoadClass`。
 - `vm.jar` 缓存不更新 -> `initJarEnv` 拷贝前先 `setWritable(true)`。
+- `BlackDexCore.isRunning()` 进程名匹配改为按包名前缀过滤，避免误检测 Helper 的代理进程。
+- Helper 配置（dumpDir、脱壳选项）通过 SharedPreferences 持久化，确保 `:p0` 进程能读到主进程设置的值。
 
 ---
 
@@ -117,14 +145,20 @@ App (Application)
 | Deep Unpacking（深度脱壳） | 修复被抽取的 DexCode（**Android 13+ 已失效，未修复**），开启会明显变慢且可能失败 |
 | Call Method（主动调用） | 运行时主动调用目标所有类，对抗函数抽取壳（仅 cookie 模式生效） |
 | Verify Dex Before Dump | dump 前校验 dex magic。部分加固会把内存中 dex magic 清零对抗脱壳，此时可关闭此项以 dump 出 magic 被破坏的 dex（写出时仍会回填 `dex\n035` magic） |
+| Enable 32-bit Compatibility | 启用 32 位兼容。安装 Helper 辅助程序后可脱壳 32 位应用 |
+| Install/Update Helper | 从 assets 安装或更新 32 位 Helper APK |
+| Dual-Architecture Dump | 目标同时包含 32/64 位时，同时执行两种架构的脱壳。结果分别保存到 `arm64/` 和 `arm32/` 子目录 |
 
 ---
 
 ## 输出位置
 
-- Android R（11）+：`/storage/emulated/0/Download/dexDump/<目标包名>/`
-- 更低版本：`<externalCacheDir>/../dump/<目标包名>/`
-- 可在设置里自定义。
+- **64 位脱壳**：`/storage/emulated/0/Download/dexDump/<目标包名>/`
+- **32 位脱壳**：同上（若 Helper 可写入 Download），或 `/storage/emulated/0/Android/data/top.niunaijun.blackdex32helper/files/dexDump/<目标包名>/`（回退目录）
+- **双架构脱壳**：
+  - `dexDump/<目标包名>/arm64/` — 64 位结果
+  - `dexDump/<目标包名>/arm32/` — 32 位结果
+- 可在设置里自定义输出目录。
 - 文件命名：`cookie_<size>.dex`（cookie 模式）、`hook_<size>.dex`（hook 模式）。同一 size 只写一次（去重）。
 
 ---
@@ -143,54 +177,70 @@ App (Application)
 ### 构建命令
 
 ```bash
-# arm64-v8a（默认）
-gradlew.bat assembleBlackDex64Debug
+# 构建 Helper（32 位辅助程序，需先构建并复制到 app/assets/）
+gradlew.bat :helper:assembleRelease
+# 复制 Helper APK 到 app/assets/helper32.apk
+copy helper\build\outputs\apk\release\helper-release.apk app\src\main\assets\helper32.apk
+
+# 构建 主 App（arm64-v8a，默认）
 gradlew.bat assembleBlackDex64Release
 
-# armeabi-v7a
-gradlew.bat assembleBlackDex32Debug
+# 构建 32 位 flavor（传统方式，不含 Helper）
 gradlew.bat assembleBlackDex32Release
-
-# 安装到设备
-gradlew.bat installBlackDex64Debug
 ```
 
 JDK 17+ 环境下需先切到 JDK 11：
 
 ```powershell
-$env:JAVA_HOME="D:\JDK\jdk11"; .\gradlew.bat assembleBlackDex64Release
+$env:JAVA_HOME="D:\JDK\jdk11"; .\gradlew.bat :helper:assembleRelease; .\gradlew.bat :app:assembleBlackDex64Release
 ```
 
 ### 模块结构（`settings.gradle`）
 
-- `:app` — Android 应用，Kotlin，包名 `top.niunaijun.blackdex`。UI 与调度。入口 `WelcomeActivity -> MainActivity`。
-- `:Bcore` — 核心引擎，Java + C++/NDK，包名 `top.niunaijun.blackbox`。脱壳逻辑、native 库 `blackdex`（CMake 构建，内含 Dobby）。
-  - `:Bcore:black-hook` — JNI hook 原语，包名 `top.niunaijun.jnihook`
-  - `:Bcore:black-fake` — fake framework，包名 `top.niunaijun.black_fake`
-- 依赖链：`app -> Bcore -> {black-hook, black-fake}`，`black-fake -> black-hook`
+- `:app` - Android 应用，Kotlin，包名 `top.niunaijun.blackdex`。UI 与调度。入口 `WelcomeActivity -> MainActivity`。
+- `:helper` - 32 位辅助程序，Kotlin，包名 `top.niunaijun.blackdex32helper`。无独立 UI（仅一个卸载入口 Activity），脱壳逻辑复用 `:Bcore`。编译为 release APK 后内嵌到 `:app` 的 assets 中。
+- `:Bcore` - 核心引擎，Java + C++/NDK，包名 `top.niunaijun.blackbox`。脱壳逻辑、native 库 `blackdex`（CMake 构建，内含 Dobby）。
+  - `:Bcore:black-hook` - JNI hook 原语，包名 `top.niunaijun.jnihook`
+  - `:Bcore:black-fake` - fake framework，包名 `top.niunaijun.black_fake`
+- 依赖链：`app -> Bcore -> {black-hook, black-fake}`，`helper -> Bcore`，`black-fake -> black-hook`
 
 ### 签名
 
-如需自签名 release 包，在 `app/` 下放 `keystore.properties`（已 gitignore）：
+主 App 和 Helper 必须使用相同的签名密钥（`keystore.properties`），Helper 的 `build.gradle` 引用 `app/keystore.properties`。相同签名用于：
+- ContentProvider/Service 的签名级权限校验
+- `PackageManager.checkSignatures()` 验证调用方身份
 
-```properties
-storeFile=../your.jks
-storePassword=xxxx
-keyAlias=xxxx
-keyPassword=xxxx
-```
-
-`app/build.gradle` 已配置 `signingConfigs.release` 从该文件读取。
+`app/build.gradle` 已配置 `signingConfigs.release` 从 `keystore.properties` 读取。
 
 ---
 
 ## 使用方法
+
+### 64 位应用脱壳
 
 1. 安装 BlackDex。
 2. （Android 11+）授予「所有文件访问权限」。
 3. 在主页列表里选中要脱壳的应用，或在右下角 FAB 选择本地 APK 文件。
 4. 等待脱壳完成（弹窗提示成功/失败，及 dex 保存路径）。
 5. 到输出目录查看 `cookie_*.dex` / `hook_*.dex`，用 jadx 等工具反编译。
+
+### 32 位应用脱壳
+
+1. 安装 BlackDex。
+2. 进入设置 > 「32位兼容」分类：
+   - 开启「启用32位兼容」
+   - 点击「安装/更新辅助程序」安装 Helper
+   - Helper 桌面图标可用于卸载
+3. 返回主页，32 位应用会显示橙色「32位」标签。
+4. 点击 32 位应用，主 App 自动启动 Helper 的脱壳流程，进度实时回传。
+5. 脱壳完成后弹窗显示结果和保存路径。
+
+### 双架构同时脱壳
+
+1. 先完成上述 32 位兼容设置。
+2. 在设置中开启「双架构同时脱壳」。
+3. 同时包含 32/64 位的应用会显示「32/64位」标签。
+4. 点击后，主 App（64 位）和 Helper（32 位）同时脱壳，结果分别保存到 `arm64/` 和 `arm32/` 子目录。
 
 > 遇到脱不出的壳，可尝试组合：开启「Hook Dump」+「主动调用」；若怀疑加固把 dex magic 清零，再关闭「Verify Dex Before Dump」。
 
@@ -202,6 +252,40 @@ keyPassword=xxxx
 - 不做任何过检测、反反调试。
 - 对加固强度较高 / 有环境检测的 app，可能直接失败或目标 app 崩溃。
 - 没有真实测试套件（仅占位 `ExampleUnitTest`），验证方式 = 能构建、能安装、能在真机上 dump 出 dex。
+- Helper 在部分设备上可能因 scoped storage 无法写入 `Download/dexDump/`，此时回退到自身 `Android/data/` 目录。
+
+---
+
+## 版本历史
+
+### v3.3.0
+
+- **新增 32 位兼容脱壳**：内嵌 32 位 Helper 辅助程序，无需单独安装 BlackDex32 即可脱壳 32 位应用
+- **新增双架构同时脱壳**：目标同时包含 32/64 位时，两种架构并行脱壳，结果分别保存到 `arm64/` 和 `arm32/` 子目录
+- **修复 `isRunning()` 进程名误匹配**：改为按包名前缀过滤，避免双架构场景下误检测对方进程
+- **Helper 配置跨进程同步**：使用 SharedPreferences 持久化配置，确保 `:p0` 进程能读到主进程设置的 dumpDir 等值
+- **Dump 目录自适应**：Helper 优先尝试写入共享 `Download/dexDump/`，不可写时回退到自身 `getExternalFilesDir`
+- **跨 App 通信**：透明 Activity + Broadcast 广播，绕过 MIUI 的 `bindService` 限制
+
+### v3.2.4
+
+- 修复 Android 16 `isRunning()` 进程名匹配问题
+
+### v3.2.3
+
+- 修复 Android 16 `ProxyActivity` 装饰窗 `SecurityException` 崩溃
+- 修复 cookie dump `SIGSEGV` 和错误 dex 匹配
+- 修复 hook dump `LoadMethod` 在 Android 16 不导出
+- 修复 `vm.jar` / 双 VMCore 类冲突
+- 修复 `vm.apk` 缓存不更新（Android 14+ dex 验证）
+- 新增「Verify Dex Before Dump」设置
+- 新增中文本地化
+- 新增下拉刷新
+- 更新 README
+
+### v3.2.2 及更早
+
+- 原项目 [BlackDex](https://github.com/CodingGay/BlackDex) 代码
 
 ---
 
@@ -213,4 +297,4 @@ keyPassword=xxxx
 
 ## 问题反馈
 
-使用问题或 Bug 欢迎提 Issue。请附上 logcat（过滤 `VmCore` 标签）和设备信息（机型、Android 版本、目标 app 及加固类型）。
+使用问题或 Bug 欢迎提 Issue。请附上 logcat（过滤 `VmCore`、`HelperManager`、`DumpLauncher` 标签）和设备信息（机型、Android 版本、目标 app 及加固类型）。

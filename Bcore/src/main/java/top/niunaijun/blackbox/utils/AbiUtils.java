@@ -20,8 +20,25 @@ import top.niunaijun.blackbox.BlackBoxCore;
  * 此处无Bug
  */
 public class AbiUtils {
+
+    public enum AbiType { NONE, ARM32_ONLY, ARM64_ONLY, BOTH }
+
     private final Set<String> mLibs = new HashSet<>();
     private static final Map<File, AbiUtils> sAbiUtilsMap = new HashMap<>();
+
+    public static AbiType detectAbi(File apkFile) {
+        AbiUtils abiUtils = sAbiUtilsMap.get(apkFile);
+        if (abiUtils == null) {
+            abiUtils = new AbiUtils(apkFile);
+            sAbiUtilsMap.put(apkFile, abiUtils);
+        }
+        boolean has64 = abiUtils.is64Bit();
+        boolean has32 = abiUtils.is32Bit();
+        if (has64 && has32) return AbiType.BOTH;
+        if (has64) return AbiType.ARM64_ONLY;
+        if (has32) return AbiType.ARM32_ONLY;
+        return AbiType.NONE;
+    }
 
     public static boolean isSupport(File apkFile) {
         AbiUtils abiUtils = sAbiUtilsMap.get(apkFile);

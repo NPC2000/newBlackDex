@@ -1,0 +1,49 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES"
+        tools:ignore="QueryAllPackagesPermission" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <permission
+        android:name="top.niunaijun.blackdex.DUMP_PERMISSION"
+        android:protectionLevel="signature" />
+
+    <application
+        android:name="top.niunaijun.blackdex.helper.HelperApp"
+        android:allowBackup="false"
+        android:icon="@drawable/ic_launcher"
+        android:label="BlackDex32 Helper"
+        android:requestLegacyExternalStorage="true"
+        android:theme="@android:style/Theme.Translucent.NoTitleBar">
+
+        <activity
+            android:name="top.niunaijun.blackdex.helper.HelperActivity"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name="top.niunaijun.blackdex.helper.DumpLauncherActivity"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:noHistory="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar" />
+
+        <service
+            android:name="top.niunaijun.blackdex.helper.DumpService"
+            android:exported="true" />
+
+        <provider
+            android:name="top.niunaijun.blackdex.helper.DumpProvider"
+            android:authorities="top.niunaijun.blackdex32helper.dump"
+            android:exported="true" />
+
+    </application>
+
+</manifest>

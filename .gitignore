@@ -1,5 +1,10 @@
 *.jks
+*.keystore
+keystore.properties
+local.properties
 /.gradle
 /.idea
 /build
+**/build/
 AGENTS.md
+.cxx

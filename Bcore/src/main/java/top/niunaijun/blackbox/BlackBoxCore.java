@@ -238,6 +238,10 @@ public class BlackBoxCore extends ClientConfiguration {
         return mClientConfiguration.getDexDumpDir();
     }
 
+    public String getDumpSubDir() {
+        return mClientConfiguration.getDumpSubDir();
+    }
+
     @Override
     public boolean isFixCodeItem() {
         return mClientConfiguration.isFixCodeItem();

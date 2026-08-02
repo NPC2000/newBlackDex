@@ -12,7 +12,6 @@ import java.util.List;
 import top.niunaijun.blackbox.app.configuration.ClientConfiguration;
 import top.niunaijun.blackbox.core.system.dump.IBDumpMonitor;
 import top.niunaijun.blackbox.entity.pm.InstallResult;
-import top.niunaijun.blackbox.proxy.ProxyManifest;
 
 /**
  * Created by Milk on 2021/5/22.
@@ -99,11 +98,10 @@ public class BlackDexCore {
 
     public boolean isRunning() {
         ActivityManager am = (ActivityManager) BlackBoxCore.getContext().getSystemService(Context.ACTIVITY_SERVICE);
+        String prefix = BlackBoxCore.getHostPkg() + ":p";
         for (ActivityManager.RunningAppProcessInfo info : am.getRunningAppProcesses()) {
-            for (int i = 0; i < ProxyManifest.FREE_COUNT; i++) {
-                if (info.processName.endsWith("p" + i)) {
-                    return true;
-                }
+            if (info.processName.startsWith(prefix)) {
+                return true;
             }
         }
         return false;

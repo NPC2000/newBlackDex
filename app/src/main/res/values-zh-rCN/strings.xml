@@ -37,4 +37,20 @@
     <string name="hook_dump">Hook 脱壳</string>
     <string name="verify_dex">脱壳前校验 Dex</string>
     <string name="verify_dex_desc">仅 dump 内存中 dex magic 合法的 cookie。当加固把内存中 dex magic 清零对抗脱壳时，可关闭此选项。</string>
+
+    <string name="bit32_compat">32位兼容</string>
+    <string name="bit32_compat_title">启用32位兼容</string>
+    <string name="bit32_compat_desc">安装32位辅助程序以脱壳32位应用</string>
+    <string name="install_helper">安装/更新辅助程序</string>
+    <string name="helper_not_installed">辅助程序未安装</string>
+    <string name="helper_installed">辅助程序已安装</string>
+    <string name="grant_overlay_permission">授予悬浮窗权限</string>
+    <string name="overlay_not_granted">悬浮窗权限未授予</string>
+    <string name="overlay_granted">悬浮窗权限已授予</string>
+    <string name="helper_installing">正在安装辅助程序…</string>
+    <string name="helper_install_success">辅助程序安装成功</string>
+    <string name="helper_install_fail">辅助程序安装失败</string>
+    <string name="overlay_required">辅助程序需要悬浮窗权限以在后台启动脱壳进程，请授予此权限。</string>
+    <string name="dual_arch_title">双架构同时脱壳</string>
+    <string name="dual_arch_desc">目标程序同时包含32/64位时，同时执行两种架构的脱壳。结果分别保存到arm64/和arm32/子目录。</string>
 </resources>

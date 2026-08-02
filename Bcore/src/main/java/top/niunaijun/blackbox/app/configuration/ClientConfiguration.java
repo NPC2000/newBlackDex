@@ -41,4 +41,8 @@ public abstract class ClientConfiguration {
     public boolean isVerifyDex() {
         return true;
     }
+
+    public String getDumpSubDir() {
+        return "";
+    }
 }

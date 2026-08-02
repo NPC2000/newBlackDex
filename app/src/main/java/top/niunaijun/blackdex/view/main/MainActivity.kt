@@ -160,10 +160,21 @@ class MainActivity : PermissionActivity() {
 
             }
         }
+
+        viewModel.mProgressLiveData.observe(this) { result ->
+            result?.let {
+                if (it.isRunning) {
+                    loadingView?.setProgress(it.currProcess, it.totalProcess)
+                }
+            }
+        }
     }
 
     private val mMonitor = object : IBDumpMonitor.Stub() {
         override fun onDump(result: DumpResult?) {
+            if (viewModel.isDualDumping()) {
+                return
+            }
             result?.let {
                 // 此处做进度条
                 if (result.isRunning) {

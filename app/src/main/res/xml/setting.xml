@@ -33,5 +33,23 @@
 
     </PreferenceCategory>
 
+    <PreferenceCategory android:title="@string/bit32_compat">
+        <SwitchPreferenceCompat
+                android:key="enable_32bit"
+                android:summary="@string/bit32_compat_desc"
+                android:title="@string/bit32_compat_title" />
+
+        <Preference
+                android:dependency="enable_32bit"
+                android:key="install_helper"
+                android:title="@string/install_helper" />
+
+        <SwitchPreferenceCompat
+                android:dependency="enable_32bit"
+                android:key="dual_arch_dump"
+                android:summary="@string/dual_arch_desc"
+                android:title="@string/dual_arch_title" />
+    </PreferenceCategory>
+
 
 </PreferenceScreen>

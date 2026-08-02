@@ -38,4 +38,20 @@
     <string name="hook_dump">Hook Dump</string>
     <string name="verify_dex">Verify Dex Before Dump</string>
     <string name="verify_dex_desc">Only dump cookies whose in-memory dex magic is valid. Disable it when the packer zeroes the dex magic in memory to anti-dump.</string>
+
+    <string name="bit32_compat">32-bit Compatibility</string>
+    <string name="bit32_compat_title">Enable 32-bit Compatibility</string>
+    <string name="bit32_compat_desc">Install a 32-bit helper app to dump 32-bit applications</string>
+    <string name="install_helper">Install/Update Helper</string>
+    <string name="helper_not_installed">Helper is not installed</string>
+    <string name="helper_installed">Helper is installed</string>
+    <string name="grant_overlay_permission">Grant Overlay Permission</string>
+    <string name="overlay_not_granted">Overlay permission not granted</string>
+    <string name="overlay_granted">Overlay permission granted</string>
+    <string name="helper_installing">Installing helper…</string>
+    <string name="helper_install_success">Helper installed successfully</string>
+    <string name="helper_install_fail">Failed to install helper</string>
+    <string name="overlay_required">The helper needs overlay permission to start the dump process in the background. Please grant this permission.</string>
+    <string name="dual_arch_title">Dual-Architecture Dump</string>
+    <string name="dual_arch_desc">When target has both 32/64-bit, dump both simultaneously. Results saved to arm64/ and arm32/ subdirectories.</string>
 </resources>

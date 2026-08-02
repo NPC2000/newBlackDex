@@ -1,7 +1,10 @@
 package top.niunaijun.blackdex.view.setting
 
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
+import android.provider.Settings
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
@@ -11,15 +14,10 @@ import top.niunaijun.blackdex.app.App
 import top.niunaijun.blackdex.R
 import top.niunaijun.blackdex.app.AppManager
 import top.niunaijun.blackdex.app.BlackDexLoader
+import top.niunaijun.blackdex.util.HelperManager
 import java.io.File
 
 
-/**
- *
- * @Description:
- * @Author: wukaicheng
- * @CreateDate: 2021/5/28 19:55
- */
 class SettingFragment : PreferenceFragmentCompat() {
 
     private lateinit var savePathPreference: Preference
@@ -33,6 +31,12 @@ class SettingFragment : PreferenceFragmentCompat() {
     private lateinit var hookDumpPreference: SwitchPreferenceCompat
 
     private lateinit var verifyDexPreference: SwitchPreferenceCompat
+
+    private lateinit var enable32BitPreference: SwitchPreferenceCompat
+
+    private lateinit var installHelperPreference: Preference
+
+    private lateinit var dualArchPreference: SwitchPreferenceCompat
 
     private val initialDirectory = AppManager.mBlackBoxLoader.getSavePath()
 
@@ -62,6 +66,60 @@ class SettingFragment : PreferenceFragmentCompat() {
         verifyDexPreference.onPreferenceChangeListener = mVerifyDexChange
         verifyDexPreference.isChecked = AppManager.mBlackBoxLoader.isVerifyDex()
 
+        enable32BitPreference = findPreference("enable_32bit")!!
+        enable32BitPreference.onPreferenceChangeListener = mEnable32BitChange
+        enable32BitPreference.isChecked = AppManager.mBlackBoxLoader.is32BitCompat()
+
+        installHelperPreference = findPreference("install_helper")!!
+        installHelperPreference.onPreferenceClickListener = mInstallHelperClick
+        updateHelperStatus()
+
+        dualArchPreference = findPreference("dual_arch_dump")!!
+        dualArchPreference.onPreferenceChangeListener = Preference.OnPreferenceChangeListener { _, newValue ->
+            AppManager.mBlackBoxLoader.setDualArchDump(newValue as Boolean)
+            true
+        }
+        dualArchPreference.isChecked = AppManager.mBlackBoxLoader.isDualArchDump()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        updateHelperStatus()
+    }
+
+    private fun updateHelperStatus() {
+        val installed = HelperManager.isHelperInstalled(requireContext())
+        installHelperPreference.summary = if (installed) {
+            val version = HelperManager.getHelperVersionCode(requireContext())
+            if (version < HelperManager.REQUIRED_HELPER_VERSION) {
+                "Helper v$version (outdated, tap to update)"
+            } else {
+                getString(R.string.helper_installed) + " v$version"
+            }
+        } else {
+            getString(R.string.helper_not_installed)
+        }
+    }
+
+    private val mEnable32BitChange = Preference.OnPreferenceChangeListener { _, newValue ->
+        AppManager.mBlackBoxLoader.set32BitCompat(newValue as Boolean)
+        true
+    }
+
+    private val mInstallHelperClick = Preference.OnPreferenceClickListener {
+        if (HelperManager.isHelperInstalled(requireContext())) {
+            MaterialDialog(requireContext()).show {
+                title(R.string.install_helper)
+                message(R.string.helper_installed)
+                positiveButton(R.string.confirm) {
+                    HelperManager.installHelper(requireContext())
+                }
+                negativeButton(R.string.cancel)
+            }
+        } else {
+            HelperManager.installHelper(requireContext())
+        }
+        true
     }
 
     private val mSavedPathClick = Preference.OnPreferenceClickListener {

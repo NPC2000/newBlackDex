@@ -105,7 +105,12 @@ public final class AppInstrumentation extends BaseInstrumentationDelegate implem
 //        }
         ContextCompat.fix(context);
         if (BlackBoxCore.get().isEnableHookDump()) {
-            String absolutePath = new File(BlackBoxCore.get().getDexDumpDir(), context.getPackageName()).getAbsolutePath();
+            File hookDir = new File(BlackBoxCore.get().getDexDumpDir(), context.getPackageName());
+            String subDir = BlackBoxCore.get().getDumpSubDir();
+            if (subDir != null && !subDir.isEmpty()) {
+                hookDir = new File(hookDir, subDir);
+            }
+            String absolutePath = hookDir.getAbsolutePath();
             FileUtils.mkdirs(absolutePath);
             //直接用宿主的VMCore，避免通过目标classloader加载vm.apk里的VMCore造成两个VMCore类
             //（native方法只RegisterNatives到先加载lib的那个，另一个会UnsatisfiedLinkError）

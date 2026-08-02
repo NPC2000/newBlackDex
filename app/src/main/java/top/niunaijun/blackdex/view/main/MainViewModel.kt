@@ -5,19 +5,17 @@ import top.niunaijun.blackdex.data.DexDumpRepository
 import top.niunaijun.blackdex.data.entity.AppInfo
 import top.niunaijun.blackdex.data.entity.DumpInfo
 import top.niunaijun.blackdex.view.base.BaseViewModel
+import top.niunaijun.blackbox.entity.dump.DumpResult
 
-/**
- *
- * @Description:
- * @Author: wukaicheng
- * @CreateDate: 2021/5/23 14:29
- */
 class MainViewModel(private val repo: DexDumpRepository) : BaseViewModel() {
 
     val mAppListLiveData = MutableLiveData<List<AppInfo>>()
 
     val mDexDumpLiveData = MutableLiveData<DumpInfo>()
 
+    val mProgressLiveData = MutableLiveData<DumpResult>()
+
+    fun isDualDumping(): Boolean = repo.isDualDumping
 
     fun getAppList() {
         launchOnUI {
@@ -27,7 +25,7 @@ class MainViewModel(private val repo: DexDumpRepository) : BaseViewModel() {
 
     fun startDexDump(source: String) {
         launchOnUI {
-            repo.dumpDex(source, mDexDumpLiveData)
+            repo.dumpDex(source, mDexDumpLiveData, mProgressLiveData)
         }
     }
 

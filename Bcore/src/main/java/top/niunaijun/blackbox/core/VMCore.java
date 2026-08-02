@@ -59,7 +59,9 @@ public class VMCore {
 
     public static void cookieDumpDex(ClassLoader classLoader, String packageName) {
         List<Long> cookies = DexFileCompat.getCookies(classLoader);
-        File file = new File(BlackBoxCore.get().getDexDumpDir(), packageName);
+        File baseFile = new File(BlackBoxCore.get().getDexDumpDir(), packageName);
+        String subDir = BlackBoxCore.get().getDumpSubDir();
+        File file = (subDir != null && !subDir.isEmpty()) ? new File(baseFile, subDir) : baseFile;
 
         DumpResult result = new DumpResult();
         result.dir = file.getAbsolutePath();
